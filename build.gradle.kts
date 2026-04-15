@@ -5,7 +5,7 @@ plugins {
 }
 
 group = "com.thecompanyinc"
-version = "1.0.0"
+version = "1.0.1"
 
 architectury {
     platformSetupLoomIde()
@@ -19,6 +19,8 @@ loom {
 repositories {
     mavenCentral()
     maven("https://artefacts.cobblemon.com/releases/")
+    maven("https://maven.shedaniel.me/")
+    maven("https://maven.terraformersmc.com/releases/")
 }
 
 dependencies {
@@ -31,6 +33,10 @@ dependencies {
     modImplementation("com.cobblemon:fabric:1.7.3+1.21.1")
     implementation("com.google.code.gson:gson:2.10.1")
     compileOnly("org.jetbrains.kotlin:kotlin-stdlib:2.0.21")
+    modApi("me.shedaniel.cloth:cloth-config-fabric:15.0.140") {
+        exclude(group = "net.fabricmc.fabric-api")
+    }
+    modApi("com.terraformersmc:modmenu:11.0.3")
 }
 
 tasks {
