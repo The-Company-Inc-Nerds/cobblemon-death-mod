@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "id": "cobblemon-death-mod",
+  "version": "${version}",
+  "name": "Cobblemon Death Mod",
+  "description": "A Nuzlocke-style mod that damages the player when their Pokémon faint in battle.",
+  "authors": ["TheCompanyInc"],
+  "contact": {},
+  "license": "MIT",
+  "environment": "*",
+  "entrypoints": {
+    "main": ["com.thecompanyinc.cobblemondeathmod.CobblemonDeathMod"],
+    "client": ["com.thecompanyinc.cobblemondeathmod.CobblemonDeathModClient"]
+  },
+  "mixins": ["cobblemon-death-mod.mixins.json"],
+  "depends": {
+    "fabricloader": ">=0.16.0",
+    "minecraft": "~1.21.1",
+    "cobblemon": ">=1.7.0"
+  }
+}
