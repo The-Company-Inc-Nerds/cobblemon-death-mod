@@ -105,6 +105,71 @@ public class DeathModConfigScreen {
         .build()
     );
 
+    nuzlocke.addEntry(
+      entryBuilder
+        .startBooleanToggle(
+          Component.literal("Mystery Sacrifice"),
+          config.isMysterySacrifice()
+        )
+        .setDefaultValue(defaults.isMysterySacrifice())
+        .setTooltip(
+          Component.literal(
+            "Obfuscate Pokémon names when choosing sacrifice (like enchantment text)"
+          )
+        )
+        .setSaveConsumer(config::setMysterySacrifice)
+        .build()
+    );
+
+    ConfigCategory capture = builder.getOrCreateCategory(
+      Component.literal("Capture Rules")
+    );
+
+    capture.addEntry(
+      entryBuilder
+        .startBooleanToggle(
+          Component.literal("Send Caught to PC"),
+          config.isSendCaughtToPC()
+        )
+        .setDefaultValue(defaults.isSendCaughtToPC())
+        .setTooltip(
+          Component.literal(
+            "Send caught Pokémon directly to PC instead of party"
+          )
+        )
+        .setSaveConsumer(config::setSendCaughtToPC)
+        .build()
+    );
+
+    capture.addEntry(
+      entryBuilder
+        .startBooleanToggle(
+          Component.literal("Caught Pokémon Start Fainted"),
+          config.isSetCaughtToZeroHP()
+        )
+        .setDefaultValue(defaults.isSetCaughtToZeroHP())
+        .setTooltip(Component.literal("Set caught Pokémon to 0 HP (fainted)"))
+        .setSaveConsumer(config::setSetCaughtToZeroHP)
+        .build()
+    );
+
+    capture.addEntry(
+      entryBuilder
+        .startEnumSelector(
+          Component.literal("Duplicate Handling"),
+          DeathModConfig.DuplicateHandling.class,
+          config.getDuplicateHandling()
+        )
+        .setDefaultValue(defaults.getDuplicateHandling())
+        .setTooltip(
+          Component.literal(
+            "OFF: Keep all\nRELEASE_IF_OWNED: Release if species in party or PC\nRELEASE_IF_EVER_CAUGHT: Release if ever caught before"
+          )
+        )
+        .setSaveConsumer(config::setDuplicateHandling)
+        .build()
+    );
+
     ConfigCategory battleTypes = builder.getOrCreateCategory(
       Component.literal("Battle Types")
     );

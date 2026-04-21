@@ -6,6 +6,8 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.util.HashSet;
+import java.util.Set;
 
 public class DeathModConfig {
 
@@ -25,6 +27,19 @@ public class DeathModConfig {
 
   private boolean removeFaintedPokemon = true;
   private boolean sacrificeOnFlee = true;
+  private boolean mysterySacrifice = false;
+
+  private boolean sendCaughtToPC = true;
+  private boolean setCaughtToZeroHP = true;
+  private DuplicateHandling duplicateHandling = DuplicateHandling.OFF;
+
+  private Set<String> caughtSpecies = new HashSet<>();
+
+  public enum DuplicateHandling {
+    OFF,
+    RELEASE_IF_OWNED,
+    RELEASE_IF_EVER_CAUGHT,
+  }
 
   public DeathModConfig() {}
 
@@ -33,7 +48,12 @@ public class DeathModConfig {
       if (CONFIG_FILE.exists()) {
         try (FileReader reader = new FileReader(CONFIG_FILE)) {
           DeathModConfig config = GSON.fromJson(reader, DeathModConfig.class);
-          return config != null ? config : new DeathModConfig();
+          if (config != null) {
+            if (config.caughtSpecies == null) {
+              config.caughtSpecies = new HashSet<>();
+            }
+            return config;
+          }
         }
       }
     } catch (IOException e) {
@@ -93,6 +113,26 @@ public class DeathModConfig {
     return sacrificeOnFlee;
   }
 
+  public boolean isMysterySacrifice() {
+    return mysterySacrifice;
+  }
+
+  public boolean isSendCaughtToPC() {
+    return sendCaughtToPC;
+  }
+
+  public boolean isSetCaughtToZeroHP() {
+    return setCaughtToZeroHP;
+  }
+
+  public DuplicateHandling getDuplicateHandling() {
+    return duplicateHandling;
+  }
+
+  public Set<String> getCaughtSpecies() {
+    return caughtSpecies;
+  }
+
   public void setScaleDamageByPartySize(boolean scaleDamageByPartySize) {
     this.scaleDamageByPartySize = scaleDamageByPartySize;
   }
@@ -123,5 +163,30 @@ public class DeathModConfig {
 
   public void setSacrificeOnFlee(boolean sacrificeOnFlee) {
     this.sacrificeOnFlee = sacrificeOnFlee;
+  }
+
+  public void setMysterySacrifice(boolean mysterySacrifice) {
+    this.mysterySacrifice = mysterySacrifice;
+  }
+
+  public void setSendCaughtToPC(boolean sendCaughtToPC) {
+    this.sendCaughtToPC = sendCaughtToPC;
+  }
+
+  public void setSetCaughtToZeroHP(boolean setCaughtToZeroHP) {
+    this.setCaughtToZeroHP = setCaughtToZeroHP;
+  }
+
+  public void setDuplicateHandling(DuplicateHandling duplicateHandling) {
+    this.duplicateHandling = duplicateHandling;
+  }
+
+  public void addCaughtSpecies(String species) {
+    caughtSpecies.add(species.toLowerCase());
+    save();
+  }
+
+  public boolean hasEverCaught(String species) {
+    return caughtSpecies.contains(species.toLowerCase());
   }
 }

@@ -7,7 +7,10 @@ import com.cobblemon.mod.common.api.battles.model.actor.BattleActor;
 import com.cobblemon.mod.common.api.events.CobblemonEvents;
 import com.cobblemon.mod.common.api.events.battles.BattleFaintedEvent;
 import com.cobblemon.mod.common.api.events.battles.BattleFledEvent;
+import com.cobblemon.mod.common.api.events.battles.BattleFleeAttemptEvent;
+import com.cobblemon.mod.common.api.events.pokemon.PokemonCapturedEvent;
 import com.cobblemon.mod.common.api.storage.party.PlayerPartyStore;
+import com.cobblemon.mod.common.api.storage.pc.PCStore;
 import com.cobblemon.mod.common.battles.actor.PlayerBattleActor;
 import com.cobblemon.mod.common.pokemon.Pokemon;
 import com.thecompanyinc.cobblemondeathmod.config.DeathModConfig;
@@ -36,12 +39,153 @@ public class CobblemonDeathMod implements ModInitializer {
       Priority.NORMAL,
       CobblemonDeathMod::handleBattleFainted
     );
+    CobblemonEvents.BATTLE_FLEE_ATTEMPT.subscribe(
+      Priority.NORMAL,
+      CobblemonDeathMod::handleBattleFleeAttempt
+    );
     CobblemonEvents.BATTLE_FLED.subscribe(
       Priority.NORMAL,
       CobblemonDeathMod::handleBattleFled
     );
+    CobblemonEvents.POKEMON_CAPTURED.subscribe(
+      Priority.NORMAL,
+      CobblemonDeathMod::handlePokemonCaptured
+    );
 
     LOGGER.info("Cobblemon Death Mod initialized!");
+  }
+
+  private static Unit handlePokemonCaptured(PokemonCapturedEvent event) {
+    Pokemon pokemon = event.getPokemon();
+    ServerPlayer player = event.getPlayer();
+    String speciesName = pokemon.getSpecies().getName();
+
+    DeathModConfig.DuplicateHandling handling = config.getDuplicateHandling();
+
+    if (handling != DeathModConfig.DuplicateHandling.OFF) {
+      boolean shouldRelease = false;
+
+      if (handling == DeathModConfig.DuplicateHandling.RELEASE_IF_OWNED) {
+        PlayerPartyStore party = Cobblemon.INSTANCE.getStorage().getParty(
+          player
+        );
+        for (Pokemon partyPokemon : party) {
+          if (
+            partyPokemon != null &&
+            partyPokemon.getSpecies().getName().equalsIgnoreCase(speciesName) &&
+            partyPokemon != pokemon
+          ) {
+            shouldRelease = true;
+            break;
+          }
+        }
+
+        if (!shouldRelease) {
+          PCStore pc = Cobblemon.INSTANCE.getStorage().getPC(player);
+          for (Pokemon pcPokemon : pc) {
+            if (
+              pcPokemon != null &&
+              pcPokemon.getSpecies().getName().equalsIgnoreCase(speciesName)
+            ) {
+              shouldRelease = true;
+              break;
+            }
+          }
+        }
+      } else if (
+        handling == DeathModConfig.DuplicateHandling.RELEASE_IF_EVER_CAUGHT
+      ) {
+        if (config.hasEverCaught(speciesName)) {
+          shouldRelease = true;
+        }
+      }
+
+      if (shouldRelease) {
+        PlayerPartyStore party = Cobblemon.INSTANCE.getStorage().getParty(
+          player
+        );
+        party.remove(pokemon);
+
+        player.sendSystemMessage(
+          Component.literal(
+            "§e" +
+              speciesName +
+              " was automatically released (duplicate species)."
+          )
+        );
+
+        LOGGER.info(
+          "Auto-released duplicate {} for player {}",
+          speciesName,
+          player.getName().getString()
+        );
+        return Unit.INSTANCE;
+      }
+    }
+
+    config.addCaughtSpecies(speciesName);
+
+    if (config.isSetCaughtToZeroHP()) {
+      pokemon.setCurrentHealth(0);
+      player.sendSystemMessage(
+        Component.literal("§7" + speciesName + " arrived fainted...")
+      );
+    }
+
+    if (config.isSendCaughtToPC()) {
+      PlayerPartyStore party = Cobblemon.INSTANCE.getStorage().getParty(player);
+      PCStore pc = Cobblemon.INSTANCE.getStorage().getPC(player);
+
+      party.remove(pokemon);
+
+      var pcPosition = pc.getFirstAvailablePosition();
+      if (pcPosition != null) {
+        pc.set(pcPosition, pokemon);
+        player.sendSystemMessage(
+          Component.literal("§a" + speciesName + " was sent to your PC.")
+        );
+      } else {
+        party.add(pokemon);
+        player.sendSystemMessage(
+          Component.literal(
+            "§cPC is full! " + speciesName + " was added to your party."
+          )
+        );
+      }
+    }
+
+    LOGGER.info(
+      "Player {} captured {}",
+      player.getName().getString(),
+      speciesName
+    );
+    return Unit.INSTANCE;
+  }
+
+  private static Unit handleBattleFleeAttempt(BattleFleeAttemptEvent event) {
+    if (!config.isSacrificeOnFlee()) {
+      return Unit.INSTANCE;
+    }
+
+    PlayerBattleActor playerActor = event.getPlayer();
+    ServerPlayer player = playerActor.getEntity();
+
+    if (player == null) {
+      return Unit.INSTANCE;
+    }
+
+    PlayerPartyStore party = Cobblemon.INSTANCE.getStorage().getParty(player);
+    int partyCount = countPartySize(party);
+
+    if (partyCount <= 1) {
+      player.sendSystemMessage(
+        Component.literal(
+          "§4WARNING: You only have one Pokémon! Fleeing will result in death!"
+        )
+      );
+    }
+
+    return Unit.INSTANCE;
   }
 
   private static Unit handleBattleFled(BattleFledEvent event) {
@@ -62,8 +206,16 @@ public class CobblemonDeathMod implements ModInitializer {
     if (partyCount <= 1) {
       player.sendSystemMessage(
         Component.literal(
-          "§eYou fled but have only one Pokémon - no sacrifice required."
+          "§4You fled with only one Pokémon! There is no escape..."
         )
+      );
+
+      CobblemonDeathModClient.triggerWhiteoutDeath();
+      player.hurt(player.damageSources().generic(), 20.0f);
+
+      LOGGER.info(
+        "Player {} fled with only one Pokemon - killed",
+        player.getName().getString()
       );
       return Unit.INSTANCE;
     }

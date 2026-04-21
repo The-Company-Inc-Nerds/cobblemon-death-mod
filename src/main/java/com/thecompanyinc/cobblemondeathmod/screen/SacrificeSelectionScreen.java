@@ -3,10 +3,10 @@ package com.thecompanyinc.cobblemondeathmod.screen;
 import com.cobblemon.mod.common.client.CobblemonClient;
 import com.cobblemon.mod.common.client.storage.ClientParty;
 import com.cobblemon.mod.common.pokemon.Pokemon;
+import com.thecompanyinc.cobblemondeathmod.CobblemonDeathMod;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
-import java.util.UUID;
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
@@ -16,9 +16,11 @@ public class SacrificeSelectionScreen extends Screen {
 
   private final List<PokemonSlot> pokemonSlots = new ArrayList<>();
   private int selectedSlot = -1;
+  private final boolean mysteryMode;
 
   public SacrificeSelectionScreen() {
     super(Component.literal("Choose a Pokémon to Sacrifice"));
+    this.mysteryMode = CobblemonDeathMod.getConfig().isMysterySacrifice();
   }
 
   @Override
@@ -29,23 +31,33 @@ public class SacrificeSelectionScreen extends Screen {
 
     ClientParty party = CobblemonClient.INSTANCE.getStorage().getParty();
 
+    List<Pokemon> partyPokemon = new ArrayList<>();
+    for (Pokemon pokemon : party) {
+      if (pokemon != null) {
+        partyPokemon.add(pokemon);
+      }
+    }
+
+    if (mysteryMode) {
+      Collections.shuffle(partyPokemon);
+    }
+
     int slotSize = 80;
     int spacing = 10;
     int totalWidth = 3 * slotSize + 2 * spacing;
     int startX = (this.width - totalWidth) / 2;
     int startY = this.height / 2 - slotSize - spacing / 2;
 
-    int index = 0;
-    for (Pokemon pokemon : party) {
-      if (pokemon != null) {
-        int row = index / 3;
-        int col = index % 3;
-        int x = startX + col * (slotSize + spacing);
-        int y = startY + row * (slotSize + spacing);
+    for (int index = 0; index < partyPokemon.size(); index++) {
+      Pokemon pokemon = partyPokemon.get(index);
+      int row = index / 3;
+      int col = index % 3;
+      int x = startX + col * (slotSize + spacing);
+      int y = startY + row * (slotSize + spacing);
 
-        pokemonSlots.add(new PokemonSlot(index, x, y, slotSize, pokemon));
-        index++;
-      }
+      pokemonSlots.add(
+        new PokemonSlot(index, x, y, slotSize, pokemon, mysteryMode)
+      );
     }
 
     this.addRenderableWidget(
@@ -64,7 +76,7 @@ public class SacrificeSelectionScreen extends Screen {
     int mouseY,
     float delta
   ) {
-    graphics.fill(0, 0, this.width, this.height, 0xCC000000);
+    graphics.fill(0, 0, this.width, this.height, 0xDD000000);
 
     String title = "You fled from battle!";
     int titleWidth = this.font.width(title);
@@ -77,7 +89,9 @@ public class SacrificeSelectionScreen extends Screen {
       true
     );
 
-    String subtitle = "Choose a Pokémon to sacrifice:";
+    String subtitle = mysteryMode
+      ? "Choose wisely... their identities are hidden:"
+      : "Choose a Pokémon to sacrifice:";
     int subtitleWidth = this.font.width(subtitle);
     graphics.drawString(
       this.font,
@@ -123,24 +137,16 @@ public class SacrificeSelectionScreen extends Screen {
       return;
     }
 
+    PokemonSlot selectedPokemonSlot = pokemonSlots.get(selectedSlot);
+    Pokemon pokemon = selectedPokemonSlot.pokemon;
+    String name = pokemon.getSpecies().getName();
+
     ClientParty party = CobblemonClient.INSTANCE.getStorage().getParty();
+    party.remove(pokemon.getUuid());
 
-    int currentIndex = 0;
-    for (Pokemon pokemon : party) {
-      if (pokemon != null) {
-        if (currentIndex == selectedSlot) {
-          String name = pokemon.getSpecies().getName();
-
-          party.remove(pokemon.getUuid());
-
-          this.minecraft.player.sendSystemMessage(
-            Component.literal("§c" + name + " was sacrificed for your escape!")
-          );
-          break;
-        }
-        currentIndex++;
-      }
-    }
+    this.minecraft.player.sendSystemMessage(
+      Component.literal("§c" + name + " was sacrificed for your escape!")
+    );
 
     this.minecraft.setScreen(null);
   }
@@ -156,9 +162,18 @@ public class SacrificeSelectionScreen extends Screen {
     final int x, y, size;
     final Pokemon pokemon;
     final String name;
+    final String displayName;
     final int level;
+    final boolean mystery;
 
-    PokemonSlot(int index, int x, int y, int size, Pokemon pokemon) {
+    PokemonSlot(
+      int index,
+      int x,
+      int y,
+      int size,
+      Pokemon pokemon,
+      boolean mysteryMode
+    ) {
       this.index = index;
       this.x = x;
       this.y = y;
@@ -166,6 +181,14 @@ public class SacrificeSelectionScreen extends Screen {
       this.pokemon = pokemon;
       this.name = pokemon.getSpecies().getName();
       this.level = pokemon.getLevel();
+      this.mystery = mysteryMode;
+
+      if (mysteryMode) {
+        this.displayName = "§k" + name + "§r";
+      } else {
+        this.displayName =
+          name.length() > 10 ? name.substring(0, 9) + "…" : name;
+      }
     }
 
     void render(
@@ -183,8 +206,6 @@ public class SacrificeSelectionScreen extends Screen {
       int borderColor = selected ? 0xFFFFFF00 : 0xFFAAAAAA;
       graphics.renderOutline(x, y, size, size, borderColor);
 
-      String displayName =
-        name.length() > 10 ? name.substring(0, 9) + "…" : name;
       int nameWidth = font.width(displayName);
       graphics.drawString(
         font,
@@ -195,7 +216,7 @@ public class SacrificeSelectionScreen extends Screen {
         false
       );
 
-      String levelStr = "Lv. " + level;
+      String levelStr = mystery ? "§kLv. ??§r" : "Lv. " + level;
       int levelWidth = font.width(levelStr);
       graphics.drawString(
         font,
@@ -206,19 +227,32 @@ public class SacrificeSelectionScreen extends Screen {
         false
       );
 
-      int currentHp = pokemon.getCurrentHealth();
-      int maxHp = pokemon.getHp();
-      String hpStr = currentHp + "/" + maxHp;
-      int hpWidth = font.width(hpStr);
-      int hpColor = pokemon.isFainted() ? 0xFF5555 : 0x55FF55;
-      graphics.drawString(
-        font,
-        hpStr,
-        x + (size - hpWidth) / 2,
-        y + size / 2 + 20,
-        hpColor,
-        false
-      );
+      if (mystery) {
+        String hpStr = "§k??/??§r";
+        int hpWidth = font.width(hpStr);
+        graphics.drawString(
+          font,
+          hpStr,
+          x + (size - hpWidth) / 2,
+          y + size / 2 + 20,
+          0x888888,
+          false
+        );
+      } else {
+        int currentHp = pokemon.getCurrentHealth();
+        int maxHp = pokemon.getHp();
+        String hpStr = currentHp + "/" + maxHp;
+        int hpWidth = font.width(hpStr);
+        int hpColor = pokemon.isFainted() ? 0xFF5555 : 0x55FF55;
+        graphics.drawString(
+          font,
+          hpStr,
+          x + (size - hpWidth) / 2,
+          y + size / 2 + 20,
+          hpColor,
+          false
+        );
+      }
     }
 
     boolean isMouseOver(int mouseX, int mouseY) {
