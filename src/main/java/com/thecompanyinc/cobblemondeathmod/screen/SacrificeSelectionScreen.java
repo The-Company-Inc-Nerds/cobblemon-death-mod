@@ -1,7 +1,7 @@
 package com.thecompanyinc.cobblemondeathmod.screen;
 
-import com.cobblemon.mod.common.Cobblemon;
-import com.cobblemon.mod.common.api.storage.party.PlayerPartyStore;
+import com.cobblemon.mod.common.client.CobblemonClient;
+import com.cobblemon.mod.common.client.storage.ClientParty;
 import com.cobblemon.mod.common.pokemon.Pokemon;
 import java.util.ArrayList;
 import java.util.List;
@@ -27,9 +27,7 @@ public class SacrificeSelectionScreen extends Screen {
 
     if (this.minecraft == null || this.minecraft.player == null) return;
 
-    PlayerPartyStore party = Cobblemon.INSTANCE.getStorage().getParty(
-      this.minecraft.player
-    );
+    ClientParty party = CobblemonClient.INSTANCE.getStorage().getParty();
 
     int slotSize = 80;
     int spacing = 10;
@@ -125,15 +123,14 @@ public class SacrificeSelectionScreen extends Screen {
       return;
     }
 
-    PlayerPartyStore party = Cobblemon.INSTANCE.getStorage().getParty(
-      this.minecraft.player
-    );
+    ClientParty party = CobblemonClient.INSTANCE.getStorage().getParty();
 
     int currentIndex = 0;
     for (Pokemon pokemon : party) {
       if (pokemon != null) {
         if (currentIndex == selectedSlot) {
           String name = pokemon.getSpecies().getName();
+
           party.remove(pokemon);
 
           this.minecraft.player.sendSystemMessage(
