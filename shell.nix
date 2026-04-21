@@ -69,5 +69,7 @@ in
       echo "Using wrapped local zed: ./.direnv/.config/zed"
       echo "Java version: $(java -version 2>&1 | head -n 1)"
       echo "JAVA_HOME: $JAVA_HOME"
+      echo "Use 'zeditor .' for custom editor for repository."
+      echo "Use 'gradle build' to build repository. If that fails try removing the '.gradle' directory."
     '';
   }

@@ -79,55 +79,74 @@ public class CobblemonDeathMod implements ModInitializer {
       return Unit.INSTANCE;
     }
 
-    int[] partyInfo = getPlayerPartyInfo(player);
-    int totalPartySize = partyInfo[0];
-    int remainingPokemon = partyInfo[1];
+    PlayerPartyStore party = Cobblemon.INSTANCE.getStorage().getParty(player);
+
+    int totalPartySize = countPartySize(party);
+
+    int remainingAfterThis = countRemainingPokemon(
+      party,
+      faintedPokemon.getEffectedPokemon()
+    );
 
     float damageAmount = calculateDamage(
       player,
       totalPartySize,
-      remainingPokemon
+      remainingAfterThis
     );
 
     String pokemonName = faintedPokemon
       .getEffectedPokemon()
       .getSpecies()
       .getName();
+
+    Pokemon faintedPokemonObj = faintedPokemon.getEffectedPokemon();
+    boolean removed = party.remove(faintedPokemonObj);
+
+    if (removed) {
+      LOGGER.info(
+        "Removed {} from {}'s party (Nuzlocke rule)",
+        pokemonName,
+        player.getName().getString()
+      );
+    }
+
     applyDamageToPlayer(
       player,
       damageAmount,
       pokemonName,
-      remainingPokemon == 0
+      remainingAfterThis == 0
     );
 
     return Unit.INSTANCE;
   }
 
   /**
-   * Returns [totalPartySize, remainingNonFaintedCount]
+   * Count total Pokemon in party (including fainted ones)
    */
-  private static int[] getPlayerPartyInfo(ServerPlayer player) {
-    try {
-      PlayerPartyStore party = Cobblemon.INSTANCE.getStorage().getParty(player);
-      int total = 0;
-      int remaining = 0;
-      for (Pokemon pokemon : party) {
-        if (pokemon != null) {
-          total++;
-          if (!pokemon.isFainted()) {
-            remaining++;
-          }
-        }
+  private static int countPartySize(PlayerPartyStore party) {
+    int count = 0;
+    for (Pokemon pokemon : party) {
+      if (pokemon != null) {
+        count++;
       }
-      return new int[] { Math.max(total, 1), remaining };
-    } catch (Exception e) {
-      LOGGER.error(
-        "Error getting party info for player {}: {}",
-        player.getName().getString(),
-        e.getMessage()
-      );
-      return new int[] { 1, 0 };
     }
+    return Math.max(count, 1); // At least 1 to avoid division by zero
+  }
+
+  /**
+   * Count remaining non-fainted Pokemon, excluding the one that just fainted
+   */
+  private static int countRemainingPokemon(
+    PlayerPartyStore party,
+    Pokemon justFainted
+  ) {
+    int remaining = 0;
+    for (Pokemon pokemon : party) {
+      if (pokemon != null && pokemon != justFainted && !pokemon.isFainted()) {
+        remaining++;
+      }
+    }
+    return remaining;
   }
 
   private static float calculateDamage(
@@ -163,15 +182,16 @@ public class CobblemonDeathMod implements ModInitializer {
   ) {
     String message;
     if (isWhiteOut) {
-      message = "§4" + pokemonName + " fainted! You have no Pokémon left!";
+      message =
+        "§4" +
+        pokemonName +
+        " fainted and was released! You have no Pokémon left!";
+      CobblemonDeathModClient.triggerWhiteoutDeath();
     } else {
-      message = config.getDamageMessage().replace("%pokemon%", pokemonName);
+      message =
+        "§c" + pokemonName + " fainted and was released! You take damage!";
     }
     player.sendSystemMessage(Component.literal(message));
-
-    if (isWhiteOut) {
-      triggerClientWhiteout(player);
-    }
 
     player.hurt(player.damageSources().generic(), damage);
 
@@ -182,10 +202,6 @@ public class CobblemonDeathMod implements ModInitializer {
       pokemonName,
       isWhiteOut
     );
-  }
-
-  private static void triggerClientWhiteout(ServerPlayer player) {
-    CobblemonDeathModClient.triggerWhiteoutDeath();
   }
 
   public static void reloadConfig() {
