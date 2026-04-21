@@ -15,16 +15,28 @@ public class PokeballDeathScreen extends Screen {
   private final List<Shard> shards = new ArrayList<>();
   private final Random random = new Random();
 
-  // Animation timing
   private static final int FADE_IN_TICKS = 20;
   private static final int POKEBALL_DISPLAY_TICKS = 40;
   private static final int SHATTER_TICKS = 60;
   private static final int SHOW_DEATH_SCREEN_TICKS = 100;
+
   private boolean shattered = false;
   private float pokeballScale = 0.0f;
 
   public PokeballDeathScreen() {
     super(Component.literal("You Blacked Out!"));
+  }
+
+  @Override
+  public void renderBackground(
+    GuiGraphics graphics,
+    int mouseX,
+    int mouseY,
+    float delta
+  ) {
+    // Don't call super - this prevents the blur
+    // Draw solid black background instead
+    graphics.fill(0, 0, this.width, this.height, 0xFF000000);
   }
 
   @Override
@@ -78,6 +90,8 @@ public class PokeballDeathScreen extends Screen {
     int mouseY,
     float delta
   ) {
+    this.renderBackground(graphics, mouseX, mouseY, delta);
+
     int centerX = this.width / 2;
     int centerY = this.height / 2;
 
@@ -99,7 +113,6 @@ public class PokeballDeathScreen extends Screen {
     fillSemiCircle(graphics, x, y, radius - 2, 0xFFFF0000, true);
     fillSemiCircle(graphics, x, y, radius - 2, 0xFFFFFFFF, false);
     graphics.fill(x - radius, y - 3, x + radius, y + 3, 0xFF000000);
-
     fillCircle(graphics, x, y, radius / 4, 0xFF000000);
     fillCircle(graphics, x, y, radius / 4 - 2, 0xFFFFFFFF);
   }

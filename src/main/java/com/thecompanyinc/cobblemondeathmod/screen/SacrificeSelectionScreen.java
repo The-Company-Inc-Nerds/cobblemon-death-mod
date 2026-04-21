@@ -7,6 +7,7 @@ import com.thecompanyinc.cobblemondeathmod.CobblemonDeathMod;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.UUID;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
@@ -67,6 +68,16 @@ public class SacrificeSelectionScreen extends Screen {
         .bounds(this.width / 2 - 75, this.height - 50, 150, 20)
         .build()
     );
+  }
+
+  @Override
+  public void renderBackground(
+    GuiGraphics graphics,
+    int mouseX,
+    int mouseY,
+    float delta
+  ) {
+    // Don't call super - this prevents the blur
   }
 
   @Override
@@ -137,14 +148,10 @@ public class SacrificeSelectionScreen extends Screen {
 
     PokemonSlot selectedPokemonSlot = pokemonSlots.get(selectedSlot);
     Pokemon pokemon = selectedPokemonSlot.pokemon;
+    UUID playerUuid = this.minecraft.player.getUUID();
+    UUID pokemonUuid = pokemon.getUuid();
 
-    CobblemonDeathMod.setSacrificePending(
-      this.minecraft.player.getUUID(),
-      pokemon.getUuid()
-    );
-
-    ClientParty party = CobblemonClient.INSTANCE.getStorage().getParty();
-    party.remove(pokemon.getUuid());
+    CobblemonDeathMod.sacrificePokemon(playerUuid, pokemonUuid);
 
     this.minecraft.setScreen(null);
   }
