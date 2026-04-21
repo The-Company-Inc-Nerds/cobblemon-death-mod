@@ -3,7 +3,7 @@
   "id": "cobblemon-death-mod",
   "version": "${version}",
   "name": "Cobblemon Death Mod",
-  "description": "A Nuzlocke-style mod that damages the player when their Pokémon faint in battle.",
+  "description": "A Nuzlocke-style mod that damages the player when their Pokémon faint in battle, removes pokemon on faint or run.",
   "authors": ["TheCompanyInc"],
   "contact": {},
   "license": "MIT",

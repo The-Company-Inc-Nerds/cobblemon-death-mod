@@ -1,5 +1,5 @@
 {
-  description = "Cobblemon death mod for nuzlocke run.";
+  description = "A Nuzlocke-style mod that damages the player when their Pokémon faint in battle, removes pokemon on faint or run.";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";

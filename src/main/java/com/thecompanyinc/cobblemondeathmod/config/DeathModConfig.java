@@ -23,6 +23,11 @@ public class DeathModConfig {
   private boolean applyInTrainerBattles = true;
   private String damageMessage = "§c%pokemon% fainted! You take damage!";
 
+  private boolean removeFaintedPokemon = true;
+  private boolean sacrificeOnFlee = true;
+
+  public DeathModConfig() {}
+
   public static DeathModConfig load() {
     try {
       if (CONFIG_FILE.exists()) {
@@ -56,7 +61,6 @@ public class DeathModConfig {
     }
   }
 
-  // Getters
   public boolean isScaleDamageByPartySize() {
     return scaleDamageByPartySize;
   }
@@ -81,7 +85,14 @@ public class DeathModConfig {
     return damageMessage;
   }
 
-  // Setters
+  public boolean isRemoveFaintedPokemon() {
+    return removeFaintedPokemon;
+  }
+
+  public boolean isSacrificeOnFlee() {
+    return sacrificeOnFlee;
+  }
+
   public void setScaleDamageByPartySize(boolean scaleDamageByPartySize) {
     this.scaleDamageByPartySize = scaleDamageByPartySize;
   }
@@ -104,5 +115,13 @@ public class DeathModConfig {
 
   public void setDamageMessage(String damageMessage) {
     this.damageMessage = damageMessage;
+  }
+
+  public void setRemoveFaintedPokemon(boolean removeFaintedPokemon) {
+    this.removeFaintedPokemon = removeFaintedPokemon;
+  }
+
+  public void setSacrificeOnFlee(boolean sacrificeOnFlee) {
+    this.sacrificeOnFlee = sacrificeOnFlee;
   }
 }

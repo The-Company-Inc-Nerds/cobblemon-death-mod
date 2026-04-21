@@ -71,6 +71,40 @@ public class DeathModConfigScreen {
         .build()
     );
 
+    ConfigCategory nuzlocke = builder.getOrCreateCategory(
+      Component.literal("Nuzlocke Rules")
+    );
+
+    nuzlocke.addEntry(
+      entryBuilder
+        .startBooleanToggle(
+          Component.literal("Remove Fainted Pokémon"),
+          config.isRemoveFaintedPokemon()
+        )
+        .setDefaultValue(defaults.isRemoveFaintedPokemon())
+        .setTooltip(
+          Component.literal(
+            "Permanently remove Pokémon from party when they faint"
+          )
+        )
+        .setSaveConsumer(config::setRemoveFaintedPokemon)
+        .build()
+    );
+
+    nuzlocke.addEntry(
+      entryBuilder
+        .startBooleanToggle(
+          Component.literal("Sacrifice on Flee"),
+          config.isSacrificeOnFlee()
+        )
+        .setDefaultValue(defaults.isSacrificeOnFlee())
+        .setTooltip(
+          Component.literal("Must sacrifice a Pokémon when fleeing from battle")
+        )
+        .setSaveConsumer(config::setSacrificeOnFlee)
+        .build()
+    );
+
     ConfigCategory battleTypes = builder.getOrCreateCategory(
       Component.literal("Battle Types")
     );
@@ -83,7 +117,7 @@ public class DeathModConfigScreen {
         )
         .setDefaultValue(defaults.isApplyInWildBattles())
         .setTooltip(
-          Component.literal("Take damage when Pokemon faint in wild battles")
+          Component.literal("Take damage when Pokémon faint in wild battles")
         )
         .setSaveConsumer(config::setApplyInWildBattles)
         .build()
@@ -98,7 +132,7 @@ public class DeathModConfigScreen {
         .setDefaultValue(defaults.isApplyInTrainerBattles())
         .setTooltip(
           Component.literal(
-            "Take damage when Pokemon faint in NPC trainer battles"
+            "Take damage when Pokémon faint in NPC trainer battles"
           )
         )
         .setSaveConsumer(config::setApplyInTrainerBattles)
@@ -118,7 +152,7 @@ public class DeathModConfigScreen {
         .setDefaultValue(defaults.getDamageMessage())
         .setTooltip(
           Component.literal(
-            "Message shown when taking damage. Use %pokemon% for the Pokemon name."
+            "Message shown when taking damage. Use %pokemon% for the Pokémon name."
           )
         )
         .setSaveConsumer(config::setDamageMessage)

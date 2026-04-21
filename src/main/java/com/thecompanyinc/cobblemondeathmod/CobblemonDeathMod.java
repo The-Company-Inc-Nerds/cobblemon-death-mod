@@ -6,6 +6,7 @@ import com.cobblemon.mod.common.api.battles.model.actor.ActorType;
 import com.cobblemon.mod.common.api.battles.model.actor.BattleActor;
 import com.cobblemon.mod.common.api.events.CobblemonEvents;
 import com.cobblemon.mod.common.api.events.battles.BattleFaintedEvent;
+import com.cobblemon.mod.common.api.events.battles.BattleFledEvent;
 import com.cobblemon.mod.common.api.storage.party.PlayerPartyStore;
 import com.cobblemon.mod.common.battles.actor.PlayerBattleActor;
 import com.cobblemon.mod.common.pokemon.Pokemon;
@@ -35,8 +36,52 @@ public class CobblemonDeathMod implements ModInitializer {
       Priority.NORMAL,
       CobblemonDeathMod::handleBattleFainted
     );
+    CobblemonEvents.BATTLE_FLED.subscribe(
+      Priority.NORMAL,
+      CobblemonDeathMod::handleBattleFled
+    );
 
     LOGGER.info("Cobblemon Death Mod initialized!");
+  }
+
+  private static Unit handleBattleFled(BattleFledEvent event) {
+    if (!config.isSacrificeOnFlee()) {
+      return Unit.INSTANCE;
+    }
+
+    PlayerBattleActor playerActor = event.getPlayer();
+    ServerPlayer player = playerActor.getEntity();
+
+    if (player == null) {
+      return Unit.INSTANCE;
+    }
+
+    PlayerPartyStore party = Cobblemon.INSTANCE.getStorage().getParty(player);
+    int partyCount = countPartySize(party);
+
+    if (partyCount <= 1) {
+      player.sendSystemMessage(
+        Component.literal(
+          "§eYou fled but have only one Pokémon - no sacrifice required."
+        )
+      );
+      return Unit.INSTANCE;
+    }
+
+    player.sendSystemMessage(
+      Component.literal(
+        "§cYou fled from battle! You must sacrifice a Pokémon..."
+      )
+    );
+
+    CobblemonDeathModClient.triggerSacrificeSelection();
+
+    LOGGER.info(
+      "Player {} fled from battle, sacrifice required",
+      player.getName().getString()
+    );
+
+    return Unit.INSTANCE;
   }
 
   private static Unit handleBattleFainted(BattleFaintedEvent event) {
@@ -80,9 +125,7 @@ public class CobblemonDeathMod implements ModInitializer {
     }
 
     PlayerPartyStore party = Cobblemon.INSTANCE.getStorage().getParty(player);
-
     int totalPartySize = countPartySize(party);
-
     int remainingAfterThis = countRemainingPokemon(
       party,
       faintedPokemon.getEffectedPokemon()
@@ -99,15 +142,17 @@ public class CobblemonDeathMod implements ModInitializer {
       .getSpecies()
       .getName();
 
-    Pokemon faintedPokemonObj = faintedPokemon.getEffectedPokemon();
-    boolean removed = party.remove(faintedPokemonObj);
+    if (config.isRemoveFaintedPokemon()) {
+      Pokemon faintedPokemonObj = faintedPokemon.getEffectedPokemon();
+      boolean removed = party.remove(faintedPokemonObj);
 
-    if (removed) {
-      LOGGER.info(
-        "Removed {} from {}'s party (Nuzlocke rule)",
-        pokemonName,
-        player.getName().getString()
-      );
+      if (removed) {
+        LOGGER.info(
+          "Removed {} from {}'s party (Nuzlocke rule)",
+          pokemonName,
+          player.getName().getString()
+        );
+      }
     }
 
     applyDamageToPlayer(
@@ -120,9 +165,6 @@ public class CobblemonDeathMod implements ModInitializer {
     return Unit.INSTANCE;
   }
 
-  /**
-   * Count total Pokemon in party (including fainted ones)
-   */
   private static int countPartySize(PlayerPartyStore party) {
     int count = 0;
     for (Pokemon pokemon : party) {
@@ -130,12 +172,9 @@ public class CobblemonDeathMod implements ModInitializer {
         count++;
       }
     }
-    return Math.max(count, 1); // At least 1 to avoid division by zero
+    return Math.max(count, 1);
   }
 
-  /**
-   * Count remaining non-fainted Pokemon, excluding the one that just fainted
-   */
   private static int countRemainingPokemon(
     PlayerPartyStore party,
     Pokemon justFainted
@@ -182,14 +221,23 @@ public class CobblemonDeathMod implements ModInitializer {
   ) {
     String message;
     if (isWhiteOut) {
+      String releaseText = config.isRemoveFaintedPokemon()
+        ? " and was released"
+        : "";
       message =
         "§4" +
         pokemonName +
-        " fainted and was released! You have no Pokémon left!";
+        " fainted" +
+        releaseText +
+        "! You have no Pokémon left!";
       CobblemonDeathModClient.triggerWhiteoutDeath();
     } else {
-      message =
-        "§c" + pokemonName + " fainted and was released! You take damage!";
+      if (config.isRemoveFaintedPokemon()) {
+        message =
+          "§c" + pokemonName + " fainted and was released! You take damage!";
+      } else {
+        message = config.getDamageMessage().replace("%pokemon%", pokemonName);
+      }
     }
     player.sendSystemMessage(Component.literal(message));
 
