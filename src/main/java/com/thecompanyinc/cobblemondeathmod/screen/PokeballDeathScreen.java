@@ -78,8 +78,6 @@ public class PokeballDeathScreen extends Screen {
     int mouseY,
     float delta
   ) {
-    graphics.fill(0, 0, this.width, this.height, 0xFF000000);
-
     int centerX = this.width / 2;
     int centerY = this.height / 2;
 

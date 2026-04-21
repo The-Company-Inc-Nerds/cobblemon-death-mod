@@ -76,8 +76,6 @@ public class SacrificeSelectionScreen extends Screen {
     int mouseY,
     float delta
   ) {
-    graphics.fill(0, 0, this.width, this.height, 0xDD000000);
-
     String title = "You fled from battle!";
     int titleWidth = this.font.width(title);
     graphics.drawString(
@@ -139,14 +137,14 @@ public class SacrificeSelectionScreen extends Screen {
 
     PokemonSlot selectedPokemonSlot = pokemonSlots.get(selectedSlot);
     Pokemon pokemon = selectedPokemonSlot.pokemon;
-    String name = pokemon.getSpecies().getName();
+
+    CobblemonDeathMod.setSacrificePending(
+      this.minecraft.player.getUUID(),
+      pokemon.getUuid()
+    );
 
     ClientParty party = CobblemonClient.INSTANCE.getStorage().getParty();
     party.remove(pokemon.getUuid());
-
-    this.minecraft.player.sendSystemMessage(
-      Component.literal("§c" + name + " was sacrificed for your escape!")
-    );
 
     this.minecraft.setScreen(null);
   }

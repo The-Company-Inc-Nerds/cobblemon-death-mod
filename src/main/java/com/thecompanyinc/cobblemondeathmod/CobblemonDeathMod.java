@@ -7,13 +7,14 @@ import com.cobblemon.mod.common.api.battles.model.actor.BattleActor;
 import com.cobblemon.mod.common.api.events.CobblemonEvents;
 import com.cobblemon.mod.common.api.events.battles.BattleFaintedEvent;
 import com.cobblemon.mod.common.api.events.battles.BattleFledEvent;
-import com.cobblemon.mod.common.api.events.battles.BattleFleeAttemptEvent;
+import com.cobblemon.mod.common.api.events.battles.BattleVictoryEvent;
 import com.cobblemon.mod.common.api.events.pokemon.PokemonCapturedEvent;
 import com.cobblemon.mod.common.api.storage.party.PlayerPartyStore;
 import com.cobblemon.mod.common.api.storage.pc.PCStore;
 import com.cobblemon.mod.common.battles.actor.PlayerBattleActor;
 import com.cobblemon.mod.common.pokemon.Pokemon;
 import com.thecompanyinc.cobblemondeathmod.config.DeathModConfig;
+import java.util.*;
 import kotlin.Unit;
 import net.fabricmc.api.ModInitializer;
 import net.minecraft.network.chat.Component;
@@ -27,6 +28,10 @@ public class CobblemonDeathMod implements ModInitializer {
   private static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
 
   private static DeathModConfig config;
+  private static final Map<UUID, Set<UUID>> faintedPokemonToRemove =
+    new HashMap<>();
+  private static UUID pendingSacrificePlayerUuid = null;
+  private static UUID pendingSacrificePokemonUuid = null;
 
   @Override
   public void onInitialize() {
@@ -39,13 +44,13 @@ public class CobblemonDeathMod implements ModInitializer {
       Priority.NORMAL,
       CobblemonDeathMod::handleBattleFainted
     );
-    CobblemonEvents.BATTLE_FLEE_ATTEMPT.subscribe(
-      Priority.NORMAL,
-      CobblemonDeathMod::handleBattleFleeAttempt
-    );
     CobblemonEvents.BATTLE_FLED.subscribe(
       Priority.NORMAL,
       CobblemonDeathMod::handleBattleFled
+    );
+    CobblemonEvents.BATTLE_VICTORY.subscribe(
+      Priority.NORMAL,
+      CobblemonDeathMod::handleBattleVictory
     );
     CobblemonEvents.POKEMON_CAPTURED.subscribe(
       Priority.NORMAL,
@@ -53,6 +58,42 @@ public class CobblemonDeathMod implements ModInitializer {
     );
 
     LOGGER.info("Cobblemon Death Mod initialized!");
+  }
+
+  private static Unit handleBattleVictory(BattleVictoryEvent event) {
+    if (!config.isRemoveFaintedPokemon()) {
+      return Unit.INSTANCE;
+    }
+
+    for (BattleActor actor : event.getBattle().getActors()) {
+      if (actor.getType() != ActorType.PLAYER) continue;
+      if (!(actor instanceof PlayerBattleActor playerActor)) continue;
+
+      ServerPlayer player = playerActor.getEntity();
+      if (player == null) continue;
+
+      Set<UUID> toRemove = faintedPokemonToRemove.remove(player.getUUID());
+      if (toRemove == null || toRemove.isEmpty()) continue;
+
+      PlayerPartyStore party = Cobblemon.INSTANCE.getStorage().getParty(player);
+
+      for (UUID pokemonUuid : toRemove) {
+        for (Pokemon pokemon : party) {
+          if (pokemon != null && pokemon.getUuid().equals(pokemonUuid)) {
+            String name = pokemon.getSpecies().getName();
+            party.remove(pokemon);
+            LOGGER.info(
+              "Removed {} from {}'s party after battle",
+              name,
+              player.getName().getString()
+            );
+            break;
+          }
+        }
+      }
+    }
+
+    return Unit.INSTANCE;
   }
 
   private static Unit handlePokemonCaptured(PokemonCapturedEvent event) {
@@ -159,32 +200,6 @@ public class CobblemonDeathMod implements ModInitializer {
       player.getName().getString(),
       speciesName
     );
-    return Unit.INSTANCE;
-  }
-
-  private static Unit handleBattleFleeAttempt(BattleFleeAttemptEvent event) {
-    if (!config.isSacrificeOnFlee()) {
-      return Unit.INSTANCE;
-    }
-
-    PlayerBattleActor playerActor = event.getPlayer();
-    ServerPlayer player = playerActor.getEntity();
-
-    if (player == null) {
-      return Unit.INSTANCE;
-    }
-
-    PlayerPartyStore party = Cobblemon.INSTANCE.getStorage().getParty(player);
-    int partyCount = countPartySize(party);
-
-    if (partyCount <= 1) {
-      player.sendSystemMessage(
-        Component.literal(
-          "§4WARNING: You only have one Pokémon! Fleeing will result in death!"
-        )
-      );
-    }
-
     return Unit.INSTANCE;
   }
 
@@ -295,16 +310,12 @@ public class CobblemonDeathMod implements ModInitializer {
       .getName();
 
     if (config.isRemoveFaintedPokemon()) {
-      Pokemon faintedPokemonObj = faintedPokemon.getEffectedPokemon();
-      boolean removed = party.remove(faintedPokemonObj);
+      UUID playerUuid = player.getUUID();
+      UUID pokemonUuid = faintedPokemon.getEffectedPokemon().getUuid();
 
-      if (removed) {
-        LOGGER.info(
-          "Removed {} from {}'s party (Nuzlocke rule)",
-          pokemonName,
-          player.getName().getString()
-        );
-      }
+      faintedPokemonToRemove
+        .computeIfAbsent(playerUuid, k -> new HashSet<>())
+        .add(pokemonUuid);
     }
 
     applyDamageToPlayer(
@@ -394,14 +405,46 @@ public class CobblemonDeathMod implements ModInitializer {
     player.sendSystemMessage(Component.literal(message));
 
     player.hurt(player.damageSources().generic(), damage);
+  }
 
-    LOGGER.debug(
-      "Applied {} damage to {} due to {} fainting (white out: {})",
-      damage,
-      player.getName().getString(),
-      pokemonName,
-      isWhiteOut
-    );
+  public static void setSacrificePending(UUID playerUuid, UUID pokemonUuid) {
+    pendingSacrificePlayerUuid = playerUuid;
+    pendingSacrificePokemonUuid = pokemonUuid;
+  }
+
+  public static void processPendingSacrifice(ServerPlayer player) {
+    if (
+      pendingSacrificePlayerUuid == null || pendingSacrificePokemonUuid == null
+    ) {
+      return;
+    }
+
+    if (!player.getUUID().equals(pendingSacrificePlayerUuid)) {
+      return;
+    }
+
+    PlayerPartyStore party = Cobblemon.INSTANCE.getStorage().getParty(player);
+
+    for (Pokemon pokemon : party) {
+      if (
+        pokemon != null && pokemon.getUuid().equals(pendingSacrificePokemonUuid)
+      ) {
+        String name = pokemon.getSpecies().getName();
+        party.remove(pokemon);
+        player.sendSystemMessage(
+          Component.literal("§c" + name + " was sacrificed for your escape!")
+        );
+        LOGGER.info(
+          "Sacrificed {} for player {}",
+          name,
+          player.getName().getString()
+        );
+        break;
+      }
+    }
+
+    pendingSacrificePlayerUuid = null;
+    pendingSacrificePokemonUuid = null;
   }
 
   public static void reloadConfig() {
