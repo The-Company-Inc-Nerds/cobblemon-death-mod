@@ -131,7 +131,7 @@ public class SacrificeSelectionScreen extends Screen {
         if (currentIndex == selectedSlot) {
           String name = pokemon.getSpecies().getName();
 
-          party.remove(pokemon);
+          party.remove(pokemon.getUuid());
 
           this.minecraft.player.sendSystemMessage(
             Component.literal("§c" + name + " was sacrificed for your escape!")
