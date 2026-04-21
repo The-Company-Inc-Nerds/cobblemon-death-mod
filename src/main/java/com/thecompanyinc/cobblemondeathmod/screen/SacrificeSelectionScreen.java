@@ -7,6 +7,7 @@ import com.thecompanyinc.cobblemondeathmod.CobblemonDeathMod;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Random;
 import java.util.UUID;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
@@ -18,6 +19,7 @@ public class SacrificeSelectionScreen extends Screen {
   private final List<PokemonSlot> pokemonSlots = new ArrayList<>();
   private int selectedSlot = -1;
   private final boolean mysteryMode;
+  private static final Random RANDOM = new Random();
 
   public SacrificeSelectionScreen() {
     super(Component.literal("Choose a Pokémon to Sacrifice"));
@@ -76,9 +78,7 @@ public class SacrificeSelectionScreen extends Screen {
     int mouseX,
     int mouseY,
     float delta
-  ) {
-    // Don't call super - this prevents the blur
-  }
+  ) {}
 
   @Override
   public void render(
@@ -161,6 +161,16 @@ public class SacrificeSelectionScreen extends Screen {
     return false;
   }
 
+  private static String generateRandomObfuscatedText(int minLen, int maxLen) {
+    int length = RANDOM.nextInt(maxLen - minLen + 1) + minLen;
+    StringBuilder sb = new StringBuilder("§k");
+    for (int i = 0; i < length; i++) {
+      sb.append((char) ('a' + RANDOM.nextInt(26)));
+    }
+    sb.append("§r");
+    return sb.toString();
+  }
+
   private static class PokemonSlot {
 
     final int index;
@@ -168,6 +178,8 @@ public class SacrificeSelectionScreen extends Screen {
     final Pokemon pokemon;
     final String name;
     final String displayName;
+    final String displayLevel;
+    final String displayHp;
     final int level;
     final boolean mystery;
 
@@ -189,10 +201,19 @@ public class SacrificeSelectionScreen extends Screen {
       this.mystery = mysteryMode;
 
       if (mysteryMode) {
-        this.displayName = "§k" + name + "§r";
+        this.displayName = generateRandomObfuscatedText(4, 12);
+        this.displayLevel = "§kLv. " + (RANDOM.nextInt(90) + 10) + "§r";
+        this.displayHp =
+          "§k" +
+          (RANDOM.nextInt(200) + 10) +
+          "/" +
+          (RANDOM.nextInt(200) + 10) +
+          "§r";
       } else {
         this.displayName =
           name.length() > 10 ? name.substring(0, 9) + "…" : name;
+        this.displayLevel = "Lv. " + level;
+        this.displayHp = pokemon.getCurrentHealth() + "/" + pokemon.getHp();
       }
     }
 
@@ -221,43 +242,28 @@ public class SacrificeSelectionScreen extends Screen {
         false
       );
 
-      String levelStr = mystery ? "§kLv. ??§r" : "Lv. " + level;
-      int levelWidth = font.width(levelStr);
+      int levelWidth = font.width(displayLevel);
       graphics.drawString(
         font,
-        levelStr,
+        displayLevel,
         x + (size - levelWidth) / 2,
         y + size / 2 + 5,
         0xAAAAAA,
         false
       );
 
-      if (mystery) {
-        String hpStr = "§k??/??§r";
-        int hpWidth = font.width(hpStr);
-        graphics.drawString(
-          font,
-          hpStr,
-          x + (size - hpWidth) / 2,
-          y + size / 2 + 20,
-          0x888888,
-          false
-        );
-      } else {
-        int currentHp = pokemon.getCurrentHealth();
-        int maxHp = pokemon.getHp();
-        String hpStr = currentHp + "/" + maxHp;
-        int hpWidth = font.width(hpStr);
-        int hpColor = pokemon.isFainted() ? 0xFF5555 : 0x55FF55;
-        graphics.drawString(
-          font,
-          hpStr,
-          x + (size - hpWidth) / 2,
-          y + size / 2 + 20,
-          hpColor,
-          false
-        );
-      }
+      int hpWidth = font.width(displayHp);
+      int hpColor = mystery
+        ? 0x888888
+        : (pokemon.isFainted() ? 0xFF5555 : 0x55FF55);
+      graphics.drawString(
+        font,
+        displayHp,
+        x + (size - hpWidth) / 2,
+        y + size / 2 + 20,
+        hpColor,
+        false
+      );
     }
 
     boolean isMouseOver(int mouseX, int mouseY) {

@@ -3,7 +3,6 @@ package com.thecompanyinc.cobblemondeathmod.screen;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.DeathScreen;
 import net.minecraft.client.gui.screens.Screen;
@@ -33,11 +32,7 @@ public class PokeballDeathScreen extends Screen {
     int mouseX,
     int mouseY,
     float delta
-  ) {
-    // Don't call super - this prevents the blur
-    // Draw solid black background instead
-    graphics.fill(0, 0, this.width, this.height, 0xFF000000);
-  }
+  ) {}
 
   @Override
   public void tick() {
@@ -90,13 +85,14 @@ public class PokeballDeathScreen extends Screen {
     int mouseY,
     float delta
   ) {
-    this.renderBackground(graphics, mouseX, mouseY, delta);
+    graphics.fill(0, 0, this.width, this.height, 0xFF000000);
 
     int centerX = this.width / 2;
     int centerY = this.height / 2;
 
-    if (!shattered) {
-      drawPokeball(graphics, centerX, centerY, (int) (50 * pokeballScale));
+    if (!shattered && pokeballScale > 0) {
+      int radius = (int) (50 * pokeballScale);
+      drawPokeball(graphics, centerX, centerY, radius);
     }
 
     for (Shard shard : shards) {
@@ -109,53 +105,34 @@ public class PokeballDeathScreen extends Screen {
   private void drawPokeball(GuiGraphics graphics, int x, int y, int radius) {
     if (radius <= 0) return;
 
-    fillCircle(graphics, x, y, radius, 0xFF000000);
-    fillSemiCircle(graphics, x, y, radius - 2, 0xFFFF0000, true);
-    fillSemiCircle(graphics, x, y, radius - 2, 0xFFFFFFFF, false);
-    graphics.fill(x - radius, y - 3, x + radius, y + 3, 0xFF000000);
-    fillCircle(graphics, x, y, radius / 4, 0xFF000000);
-    fillCircle(graphics, x, y, radius / 4 - 2, 0xFFFFFFFF);
-  }
-
-  private void fillCircle(
-    GuiGraphics graphics,
-    int centerX,
-    int centerY,
-    int radius,
-    int color
-  ) {
     for (int dy = -radius; dy <= radius; dy++) {
       int dx = (int) Math.sqrt(radius * radius - dy * dy);
-      graphics.fill(
-        centerX - dx,
-        centerY + dy,
-        centerX + dx,
-        centerY + dy + 1,
-        color
-      );
+      graphics.fill(x - dx, y + dy, x + dx, y + dy + 1, 0xFF222222);
     }
-  }
 
-  private void fillSemiCircle(
-    GuiGraphics graphics,
-    int centerX,
-    int centerY,
-    int radius,
-    int color,
-    boolean top
-  ) {
-    int startY = top ? -radius : 0;
-    int endY = top ? 0 : radius;
+    for (int dy = -radius + 2; dy < 0; dy++) {
+      int dx = (int) Math.sqrt((radius - 2) * (radius - 2) - dy * dy);
+      graphics.fill(x - dx, y + dy, x + dx, y + dy + 1, 0xFFFF0000);
+    }
 
-    for (int dy = startY; dy <= endY; dy++) {
-      int dx = (int) Math.sqrt(radius * radius - dy * dy);
-      graphics.fill(
-        centerX - dx,
-        centerY + dy,
-        centerX + dx,
-        centerY + dy + 1,
-        color
-      );
+    for (int dy = 0; dy <= radius - 2; dy++) {
+      int dx = (int) Math.sqrt((radius - 2) * (radius - 2) - dy * dy);
+      graphics.fill(x - dx, y + dy, x + dx, y + dy + 1, 0xFFFFFFFF);
+    }
+
+    graphics.fill(x - radius, y - 2, x + radius, y + 3, 0xFF222222);
+
+    int buttonRadius = radius / 4;
+    for (int dy = -buttonRadius; dy <= buttonRadius; dy++) {
+      int dx = (int) Math.sqrt(buttonRadius * buttonRadius - dy * dy);
+      graphics.fill(x - dx, y + dy, x + dx, y + dy + 1, 0xFF222222);
+    }
+    int innerRadius = buttonRadius - 2;
+    if (innerRadius > 0) {
+      for (int dy = -innerRadius; dy <= innerRadius; dy++) {
+        int dx = (int) Math.sqrt(innerRadius * innerRadius - dy * dy);
+        graphics.fill(x - dx, y + dy, x + dx, y + dy + 1, 0xFFFFFFFF);
+      }
     }
   }
 

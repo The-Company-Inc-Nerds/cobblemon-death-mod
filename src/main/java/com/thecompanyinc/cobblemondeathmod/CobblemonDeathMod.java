@@ -27,6 +27,7 @@ public class CobblemonDeathMod implements ModInitializer {
   private static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
 
   private static DeathModConfig config;
+  private static boolean pendingWhiteoutDeath = false;
 
   @Override
   public void onInitialize() {
@@ -180,7 +181,7 @@ public class CobblemonDeathMod implements ModInitializer {
         )
       );
 
-      CobblemonDeathModClient.triggerWhiteoutDeath();
+      pendingWhiteoutDeath = true;
       player.hurt(player.damageSources().generic(), 20.0f);
 
       LOGGER.info(
@@ -379,7 +380,7 @@ public class CobblemonDeathMod implements ModInitializer {
         " fainted" +
         releaseText +
         "! You have no Pokémon left!";
-      CobblemonDeathModClient.triggerWhiteoutDeath();
+      pendingWhiteoutDeath = true;
     } else {
       if (config.isRemoveFaintedPokemon()) {
         message =
@@ -391,6 +392,14 @@ public class CobblemonDeathMod implements ModInitializer {
     player.sendSystemMessage(Component.literal(message));
 
     player.hurt(player.damageSources().generic(), damage);
+  }
+
+  public static boolean consumePendingWhiteoutDeath() {
+    if (pendingWhiteoutDeath) {
+      pendingWhiteoutDeath = false;
+      return true;
+    }
+    return false;
   }
 
   public static void reloadConfig() {
