@@ -12,10 +12,15 @@ import com.cobblemon.mod.common.api.storage.party.PlayerPartyStore;
 import com.cobblemon.mod.common.api.storage.pc.PCStore;
 import com.cobblemon.mod.common.battles.actor.PlayerBattleActor;
 import com.cobblemon.mod.common.pokemon.Pokemon;
+import com.mojang.brigadier.arguments.BoolArgumentType;
+import com.mojang.brigadier.arguments.IntegerArgumentType;
+import com.mojang.brigadier.arguments.StringArgumentType;
 import com.thecompanyinc.cobblemondeathmod.config.DeathModConfig;
 import java.util.UUID;
 import kotlin.Unit;
 import net.fabricmc.api.ModInitializer;
+import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
+import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import org.slf4j.Logger;
@@ -28,6 +33,7 @@ public class CobblemonDeathMod implements ModInitializer {
 
   private static DeathModConfig config;
   private static boolean pendingWhiteoutDeath = false;
+  private static boolean pendingSacrifice = false;
 
   @Override
   public void onInitialize() {
@@ -49,7 +55,233 @@ public class CobblemonDeathMod implements ModInitializer {
       CobblemonDeathMod::handlePokemonCaptured
     );
 
+    registerCommands();
+
     LOGGER.info("Cobblemon Death Mod initialized!");
+  }
+
+  private void registerCommands() {
+    CommandRegistrationCallback.EVENT.register(
+      (dispatcher, registryAccess, environment) -> {
+        dispatcher.register(
+          Commands.literal("nuzlocke")
+            .then(
+              Commands.literal("deathscreen").executes(context -> {
+                var player = context.getSource().getPlayerOrException();
+
+                player.sendSystemMessage(
+                  Component.literal("§4Triggering death screen...")
+                );
+
+                pendingWhiteoutDeath = true;
+                player.hurt(player.damageSources().generic(), 20.0f);
+
+                return 1;
+              })
+            )
+            .then(
+              Commands.literal("sacrifice").executes(context -> {
+                var player = context.getSource().getPlayerOrException();
+
+                PlayerPartyStore party =
+                  Cobblemon.INSTANCE.getStorage().getParty(player);
+                int partyCount = countPartySize(party);
+
+                if (partyCount <= 1) {
+                  player.sendSystemMessage(
+                    Component.literal(
+                      "§4You only have one Pokémon! Triggering death instead..."
+                    )
+                  );
+
+                  pendingWhiteoutDeath = true;
+                  player.hurt(player.damageSources().generic(), 20.0f);
+                } else {
+                  player.sendSystemMessage(
+                    Component.literal("§cTriggering sacrifice selection...")
+                  );
+
+                  pendingSacrifice = true;
+                }
+
+                return 1;
+              })
+            )
+            .then(
+              Commands.literal("reload")
+                .requires(source -> source.hasPermission(2))
+                .executes(context -> {
+                  reloadConfig();
+                  context
+                    .getSource()
+                    .sendSuccess(
+                      () -> Component.literal("§aConfig reloaded!"),
+                      true
+                    );
+                  return 1;
+                })
+            )
+        );
+
+        dispatcher.register(
+          Commands.literal("safezone")
+            .requires(source -> source.hasPermission(2))
+            .then(
+              Commands.literal("add").then(
+                Commands.argument("name", StringArgumentType.word()).then(
+                  Commands.argument(
+                    "radius",
+                    IntegerArgumentType.integer(1, 500)
+                  ).then(
+                    Commands.argument(
+                      "hostileOnly",
+                      BoolArgumentType.bool()
+                    ).executes(context -> {
+                      var source = context.getSource();
+                      var player = source.getPlayerOrException();
+                      String name = StringArgumentType.getString(
+                        context,
+                        "name"
+                      );
+                      int radius = IntegerArgumentType.getInteger(
+                        context,
+                        "radius"
+                      );
+                      boolean hostileOnly = BoolArgumentType.getBool(
+                        context,
+                        "hostileOnly"
+                      );
+
+                      String dimension = player
+                        .level()
+                        .dimension()
+                        .location()
+                        .toString();
+                      int x = player.getBlockX();
+                      int y = player.getBlockY();
+                      int z = player.getBlockZ();
+
+                      DeathModConfig.SafeZone zone =
+                        new DeathModConfig.SafeZone(
+                          name,
+                          dimension,
+                          x,
+                          y,
+                          z,
+                          radius,
+                          hostileOnly
+                        );
+                      config.addSafeZone(zone);
+
+                      source.sendSuccess(
+                        () ->
+                          Component.literal(
+                            "§aCreated safe zone '" +
+                              name +
+                              "' at " +
+                              x +
+                              ", " +
+                              y +
+                              ", " +
+                              z +
+                              " with radius " +
+                              radius +
+                              " (hostile only: " +
+                              hostileOnly +
+                              ")"
+                          ),
+                        true
+                      );
+                      return 1;
+                    })
+                  )
+                )
+              )
+            )
+            .then(
+              Commands.literal("remove").then(
+                Commands.argument("name", StringArgumentType.word()).executes(
+                  context -> {
+                    String name = StringArgumentType.getString(context, "name");
+                    boolean removed = config.removeSafeZone(name);
+
+                    if (removed) {
+                      context
+                        .getSource()
+                        .sendSuccess(
+                          () ->
+                            Component.literal(
+                              "§aRemoved safe zone '" + name + "'"
+                            ),
+                          true
+                        );
+                    } else {
+                      context
+                        .getSource()
+                        .sendFailure(
+                          Component.literal(
+                            "§cSafe zone '" + name + "' not found"
+                          )
+                        );
+                    }
+                    return removed ? 1 : 0;
+                  }
+                )
+              )
+            )
+            .then(
+              Commands.literal("list").executes(context -> {
+                var zones = config.getSafeZones();
+                if (zones.isEmpty()) {
+                  context
+                    .getSource()
+                    .sendSuccess(
+                      () -> Component.literal("§7No safe zones defined"),
+                      false
+                    );
+                } else {
+                  context
+                    .getSource()
+                    .sendSuccess(
+                      () ->
+                        Component.literal(
+                          "§6Safe Zones (" + zones.size() + "):"
+                        ),
+                      false
+                    );
+                  for (var zone : zones) {
+                    context
+                      .getSource()
+                      .sendSuccess(
+                        () ->
+                          Component.literal(
+                            "§7- " +
+                              zone.name +
+                              ": " +
+                              zone.centerX +
+                              ", " +
+                              zone.centerY +
+                              ", " +
+                              zone.centerZ +
+                              " r=" +
+                              zone.radius +
+                              " (" +
+                              zone.dimension +
+                              ")" +
+                              (zone.preventHostileOnly
+                                ? " [hostile only]"
+                                : " [all mobs]")
+                          ),
+                        false
+                      );
+                  }
+                }
+                return zones.size();
+              })
+            )
+        );
+      }
+    );
   }
 
   private static Unit handlePokemonCaptured(PokemonCapturedEvent event) {
@@ -197,7 +429,7 @@ public class CobblemonDeathMod implements ModInitializer {
       )
     );
 
-    CobblemonDeathModClient.triggerSacrificeSelection();
+    pendingSacrifice = true;
 
     LOGGER.info(
       "Player {} fled from battle, sacrifice required",
@@ -397,6 +629,14 @@ public class CobblemonDeathMod implements ModInitializer {
   public static boolean consumePendingWhiteoutDeath() {
     if (pendingWhiteoutDeath) {
       pendingWhiteoutDeath = false;
+      return true;
+    }
+    return false;
+  }
+
+  public static boolean consumePendingSacrifice() {
+    if (pendingSacrifice) {
+      pendingSacrifice = false;
       return true;
     }
     return false;

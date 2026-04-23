@@ -3,6 +3,7 @@
   "package": "com.thecompanyinc.cobblemondeathmod.mixin",
   "compatibilityLevel": "JAVA_21",
   "client": ["DeathScreenMixin"],
+  "mixins": ["MobSpawnMixin"],
   "injectors": {
     "defaultRequire": 1
   }

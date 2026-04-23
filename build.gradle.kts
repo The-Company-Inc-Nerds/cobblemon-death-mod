@@ -5,7 +5,7 @@ plugins {
 }
 
 group = "com.thecompanyinc"
-version = "1.3.4"
+version = "1.4.0"
 
 architectury {
     platformSetupLoomIde()
@@ -37,6 +37,7 @@ dependencies {
         exclude(group = "net.fabricmc.fabric-api")
     }
     modApi("com.terraformersmc:modmenu:11.0.3")
+    modImplementation(fabricApi.module("fabric-lifecycle-events-v1", "0.116.6+1.21.1"))
 }
 
 tasks {

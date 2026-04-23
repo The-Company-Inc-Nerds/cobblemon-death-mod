@@ -6,8 +6,7 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.*;
 
 public class DeathModConfig {
 
@@ -24,21 +23,60 @@ public class DeathModConfig {
   private boolean applyInWildBattles = true;
   private boolean applyInTrainerBattles = true;
   private String damageMessage = "§c%pokemon% fainted! You take damage!";
-
   private boolean removeFaintedPokemon = true;
   private boolean sacrificeOnFlee = true;
   private boolean mysterySacrifice = false;
-
   private boolean sendCaughtToPC = true;
   private boolean setCaughtToZeroHP = true;
   private DuplicateHandling duplicateHandling = DuplicateHandling.OFF;
-
   private Set<String> caughtSpecies = new HashSet<>();
+  private boolean enableSafeZones = true;
+  private List<SafeZone> safeZones = new ArrayList<>();
 
   public enum DuplicateHandling {
     OFF,
     RELEASE_IF_OWNED,
     RELEASE_IF_EVER_CAUGHT,
+  }
+
+  public static class SafeZone {
+
+    public String name;
+    public String dimension;
+    public int centerX;
+    public int centerY;
+    public int centerZ;
+    public int radius;
+    public boolean preventHostileOnly;
+
+    public SafeZone() {}
+
+    public SafeZone(
+      String name,
+      String dimension,
+      int x,
+      int y,
+      int z,
+      int radius,
+      boolean hostileOnly
+    ) {
+      this.name = name;
+      this.dimension = dimension;
+      this.centerX = x;
+      this.centerY = y;
+      this.centerZ = z;
+      this.radius = radius;
+      this.preventHostileOnly = hostileOnly;
+    }
+
+    public boolean contains(String dim, int x, int y, int z) {
+      if (!dimension.equals(dim)) return false;
+
+      int dx = x - centerX;
+      int dy = y - centerY;
+      int dz = z - centerZ;
+      return (dx * dx + dy * dy + dz * dz) <= (radius * radius);
+    }
   }
 
   public DeathModConfig() {}
@@ -49,9 +87,9 @@ public class DeathModConfig {
         try (FileReader reader = new FileReader(CONFIG_FILE)) {
           DeathModConfig config = GSON.fromJson(reader, DeathModConfig.class);
           if (config != null) {
-            if (config.caughtSpecies == null) {
-              config.caughtSpecies = new HashSet<>();
-            }
+            if (config.caughtSpecies == null) config.caughtSpecies =
+              new HashSet<>();
+            if (config.safeZones == null) config.safeZones = new ArrayList<>();
             return config;
           }
         }
@@ -133,52 +171,68 @@ public class DeathModConfig {
     return caughtSpecies;
   }
 
-  public void setScaleDamageByPartySize(boolean scaleDamageByPartySize) {
-    this.scaleDamageByPartySize = scaleDamageByPartySize;
+  public boolean isEnableSafeZones() {
+    return enableSafeZones;
   }
 
-  public void setUseMaxHealth(boolean useMaxHealth) {
-    this.useMaxHealth = useMaxHealth;
+  public List<SafeZone> getSafeZones() {
+    return safeZones;
   }
 
-  public void setMinimumDamagePercent(float minimumDamagePercent) {
-    this.minimumDamagePercent = minimumDamagePercent;
+  public void setScaleDamageByPartySize(boolean v) {
+    this.scaleDamageByPartySize = v;
   }
 
-  public void setApplyInWildBattles(boolean applyInWildBattles) {
-    this.applyInWildBattles = applyInWildBattles;
+  public void setUseMaxHealth(boolean v) {
+    this.useMaxHealth = v;
   }
 
-  public void setApplyInTrainerBattles(boolean applyInTrainerBattles) {
-    this.applyInTrainerBattles = applyInTrainerBattles;
+  public void setMinimumDamagePercent(float v) {
+    this.minimumDamagePercent = v;
   }
 
-  public void setDamageMessage(String damageMessage) {
-    this.damageMessage = damageMessage;
+  public void setApplyInWildBattles(boolean v) {
+    this.applyInWildBattles = v;
   }
 
-  public void setRemoveFaintedPokemon(boolean removeFaintedPokemon) {
-    this.removeFaintedPokemon = removeFaintedPokemon;
+  public void setApplyInTrainerBattles(boolean v) {
+    this.applyInTrainerBattles = v;
   }
 
-  public void setSacrificeOnFlee(boolean sacrificeOnFlee) {
-    this.sacrificeOnFlee = sacrificeOnFlee;
+  public void setDamageMessage(String v) {
+    this.damageMessage = v;
   }
 
-  public void setMysterySacrifice(boolean mysterySacrifice) {
-    this.mysterySacrifice = mysterySacrifice;
+  public void setRemoveFaintedPokemon(boolean v) {
+    this.removeFaintedPokemon = v;
   }
 
-  public void setSendCaughtToPC(boolean sendCaughtToPC) {
-    this.sendCaughtToPC = sendCaughtToPC;
+  public void setSacrificeOnFlee(boolean v) {
+    this.sacrificeOnFlee = v;
   }
 
-  public void setSetCaughtToZeroHP(boolean setCaughtToZeroHP) {
-    this.setCaughtToZeroHP = setCaughtToZeroHP;
+  public void setMysterySacrifice(boolean v) {
+    this.mysterySacrifice = v;
   }
 
-  public void setDuplicateHandling(DuplicateHandling duplicateHandling) {
-    this.duplicateHandling = duplicateHandling;
+  public void setSendCaughtToPC(boolean v) {
+    this.sendCaughtToPC = v;
+  }
+
+  public void setSetCaughtToZeroHP(boolean v) {
+    this.setCaughtToZeroHP = v;
+  }
+
+  public void setDuplicateHandling(DuplicateHandling v) {
+    this.duplicateHandling = v;
+  }
+
+  public void setEnableSafeZones(boolean v) {
+    this.enableSafeZones = v;
+  }
+
+  public void setSafeZones(List<SafeZone> v) {
+    this.safeZones = v;
   }
 
   public void addCaughtSpecies(String species) {
@@ -188,5 +242,35 @@ public class DeathModConfig {
 
   public boolean hasEverCaught(String species) {
     return caughtSpecies.contains(species.toLowerCase());
+  }
+
+  public void addSafeZone(SafeZone zone) {
+    safeZones.add(zone);
+    save();
+  }
+
+  public boolean removeSafeZone(String name) {
+    boolean removed = safeZones.removeIf(z -> z.name.equalsIgnoreCase(name));
+    if (removed) save();
+    return removed;
+  }
+
+  public boolean isInSafeZone(String dimension, int x, int y, int z) {
+    if (!enableSafeZones) return false;
+    for (SafeZone zone : safeZones) {
+      if (zone.contains(dimension, x, y, z)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  public SafeZone getSafeZoneAt(String dimension, int x, int y, int z) {
+    for (SafeZone zone : safeZones) {
+      if (zone.contains(dimension, x, y, z)) {
+        return zone;
+      }
+    }
+    return null;
   }
 }

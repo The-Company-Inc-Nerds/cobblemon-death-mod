@@ -2,6 +2,7 @@ package com.thecompanyinc.cobblemondeathmod;
 
 import com.thecompanyinc.cobblemondeathmod.screen.SacrificeSelectionScreen;
 import net.fabricmc.api.ClientModInitializer;
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.minecraft.client.Minecraft;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -14,11 +15,17 @@ public class CobblemonDeathModClient implements ClientModInitializer {
 
   public static boolean isPokemonWhiteout = false;
 
-  public static boolean needsSacrifice = false;
-
   @Override
   public void onInitializeClient() {
     LOGGER.info("Cobblemon Death Mod client initialized!");
+
+    ClientTickEvents.END_CLIENT_TICK.register(client -> {
+      if (client.player != null && client.screen == null) {
+        if (CobblemonDeathMod.consumePendingSacrifice()) {
+          client.setScreen(new SacrificeSelectionScreen());
+        }
+      }
+    });
   }
 
   public static void triggerWhiteoutDeath() {
@@ -30,7 +37,6 @@ public class CobblemonDeathModClient implements ClientModInitializer {
   }
 
   public static void triggerSacrificeSelection() {
-    needsSacrifice = true;
     Minecraft.getInstance().execute(() -> {
       Minecraft.getInstance().setScreen(new SacrificeSelectionScreen());
     });
