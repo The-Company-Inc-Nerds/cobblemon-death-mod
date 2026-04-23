@@ -48,6 +48,7 @@ public class DeathModConfig {
     public int centerZ;
     public int radius;
     public boolean preventHostileOnly;
+    public boolean cylindrical;
 
     public SafeZone() {}
 
@@ -58,7 +59,8 @@ public class DeathModConfig {
       int y,
       int z,
       int radius,
-      boolean hostileOnly
+      boolean hostileOnly,
+      boolean cylindrical
     ) {
       this.name = name;
       this.dimension = dimension;
@@ -67,15 +69,22 @@ public class DeathModConfig {
       this.centerZ = z;
       this.radius = radius;
       this.preventHostileOnly = hostileOnly;
+      this.cylindrical = cylindrical;
     }
 
     public boolean contains(String dim, int x, int y, int z) {
       if (!dimension.equals(dim)) return false;
 
       int dx = x - centerX;
-      int dy = y - centerY;
       int dz = z - centerZ;
-      return (dx * dx + dy * dy + dz * dz) <= (radius * radius);
+      int distSq = dx * dx + dz * dz;
+
+      if (!cylindrical) {
+        int dy = y - centerY;
+        distSq += dy * dy;
+      }
+
+      return distSq <= (radius * radius);
     }
   }
 

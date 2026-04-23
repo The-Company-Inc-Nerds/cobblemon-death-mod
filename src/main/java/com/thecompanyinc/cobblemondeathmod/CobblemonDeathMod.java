@@ -7,6 +7,7 @@ import com.cobblemon.mod.common.api.battles.model.actor.BattleActor;
 import com.cobblemon.mod.common.api.events.CobblemonEvents;
 import com.cobblemon.mod.common.api.events.battles.BattleFaintedEvent;
 import com.cobblemon.mod.common.api.events.battles.BattleFledEvent;
+import com.cobblemon.mod.common.api.events.battles.BattleVictoryEvent;
 import com.cobblemon.mod.common.api.events.pokemon.PokemonCapturedEvent;
 import com.cobblemon.mod.common.api.storage.party.PlayerPartyStore;
 import com.cobblemon.mod.common.api.storage.pc.PCStore;
@@ -49,6 +50,10 @@ public class CobblemonDeathMod implements ModInitializer {
     CobblemonEvents.BATTLE_FLED.subscribe(
       Priority.NORMAL,
       CobblemonDeathMod::handleBattleFled
+    );
+    CobblemonEvents.BATTLE_VICTORY.subscribe(
+      Priority.NORMAL,
+      CobblemonDeathMod::handleBattleVictory
     );
     CobblemonEvents.POKEMON_CAPTURED.subscribe(
       Priority.NORMAL,
@@ -136,64 +141,76 @@ public class CobblemonDeathMod implements ModInitializer {
                     Commands.argument(
                       "hostileOnly",
                       BoolArgumentType.bool()
-                    ).executes(context -> {
-                      var source = context.getSource();
-                      var player = source.getPlayerOrException();
-                      String name = StringArgumentType.getString(
-                        context,
-                        "name"
-                      );
-                      int radius = IntegerArgumentType.getInteger(
-                        context,
-                        "radius"
-                      );
-                      boolean hostileOnly = BoolArgumentType.getBool(
-                        context,
-                        "hostileOnly"
-                      );
-
-                      String dimension = player
-                        .level()
-                        .dimension()
-                        .location()
-                        .toString();
-                      int x = player.getBlockX();
-                      int y = player.getBlockY();
-                      int z = player.getBlockZ();
-
-                      DeathModConfig.SafeZone zone =
-                        new DeathModConfig.SafeZone(
-                          name,
-                          dimension,
-                          x,
-                          y,
-                          z,
-                          radius,
-                          hostileOnly
+                    ).then(
+                      Commands.argument(
+                        "cylindrical",
+                        BoolArgumentType.bool()
+                      ).executes(context -> {
+                        var source = context.getSource();
+                        var player = source.getPlayerOrException();
+                        String name = StringArgumentType.getString(
+                          context,
+                          "name"
                         );
-                      config.addSafeZone(zone);
+                        int radius = IntegerArgumentType.getInteger(
+                          context,
+                          "radius"
+                        );
+                        boolean hostileOnly = BoolArgumentType.getBool(
+                          context,
+                          "hostileOnly"
+                        );
+                        boolean isCylindrical = BoolArgumentType.getBool(
+                          context,
+                          "cylindrical"
+                        );
 
-                      source.sendSuccess(
-                        () ->
-                          Component.literal(
-                            "§aCreated safe zone '" +
-                              name +
-                              "' at " +
-                              x +
-                              ", " +
-                              y +
-                              ", " +
-                              z +
-                              " with radius " +
-                              radius +
-                              " (hostile only: " +
-                              hostileOnly +
-                              ")"
-                          ),
-                        true
-                      );
-                      return 1;
-                    })
+                        String dimension = player
+                          .level()
+                          .dimension()
+                          .location()
+                          .toString();
+                        int x = player.getBlockX();
+                        int y = player.getBlockY();
+                        int z = player.getBlockZ();
+
+                        DeathModConfig.SafeZone zone =
+                          new DeathModConfig.SafeZone(
+                            name,
+                            dimension,
+                            x,
+                            y,
+                            z,
+                            radius,
+                            hostileOnly,
+                            isCylindrical
+                          );
+                        config.addSafeZone(zone);
+
+                        source.sendSuccess(
+                          () ->
+                            Component.literal(
+                              "§aCreated safe zone '" +
+                                name +
+                                "' at " +
+                                x +
+                                ", " +
+                                y +
+                                ", " +
+                                z +
+                                " with radius " +
+                                radius +
+                                " (hostile only: " +
+                                hostileOnly +
+                                ") (is cylindrical: " +
+                                isCylindrical +
+                                ")"
+                            ),
+                          true
+                        );
+                        return 1;
+                      })
+                    )
                   )
                 )
               )
@@ -435,6 +452,80 @@ public class CobblemonDeathMod implements ModInitializer {
       "Player {} fled from battle, sacrifice required",
       player.getName().getString()
     );
+
+    return Unit.INSTANCE;
+  }
+
+  private static Unit handleBattleVictory(BattleVictoryEvent event) {
+    if (!config.isSacrificeOnFlee()) {
+      return Unit.INSTANCE;
+    }
+
+    if (event.getWasWildCapture()) {
+      return Unit.INSTANCE;
+    }
+
+    for (BattleActor loser : event.getLosers()) {
+      if (loser.getType() != ActorType.PLAYER) {
+        continue;
+      }
+
+      if (!(loser instanceof PlayerBattleActor playerActor)) {
+        continue;
+      }
+
+      ServerPlayer player = playerActor.getEntity();
+      if (player == null) {
+        continue;
+      }
+
+      boolean wasTrainerBattle = false;
+      for (BattleActor actor : event.getBattle().getActors()) {
+        if (actor.getType() == ActorType.NPC) {
+          wasTrainerBattle = true;
+          break;
+        }
+      }
+
+      if (!wasTrainerBattle) {
+        continue;
+      }
+
+      PlayerPartyStore party = Cobblemon.INSTANCE.getStorage().getParty(player);
+      int remainingPokemon = 0;
+      for (Pokemon pokemon : party) {
+        if (pokemon != null && !pokemon.isFainted()) {
+          remainingPokemon++;
+        }
+      }
+
+      if (remainingPokemon > 0) {
+        LOGGER.info(
+          "Player {} forfeited trainer battle with {} Pokemon remaining",
+          player.getName().getString(),
+          remainingPokemon
+        );
+
+        if (remainingPokemon == 1) {
+          player.sendSystemMessage(
+            Component.literal(
+              "§4You forfeited with only one Pokémon! There is no escape..."
+            )
+          );
+
+          pendingWhiteoutDeath = true;
+          player.hurt(player.damageSources().generic(), 20.0f);
+        } else {
+          player.sendSystemMessage(
+            Component.literal(
+              "§cYou forfeited the battle! You must sacrifice a Pokémon..."
+            )
+          );
+
+          CobblemonDeathModClient.triggerSacrificeSelection();
+        }
+      }
+    }
 
     return Unit.INSTANCE;
   }
